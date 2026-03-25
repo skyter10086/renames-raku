@@ -9,7 +9,7 @@ sub MAIN(
     Str :d($dir) = '.',
     Bool :r($recursive) = False,
     Bool :y($dry) = False,
-    Int :$concurrency = 16  # 并发数，SSD 可调 32，机械盘 8
+    Int :$concurrency = 32  # 并发数，SSD 可调 32，机械盘 8
 ) {
     # 🔥 内置 Supply，无需任何 use
 # 🔥 核心：Seq 直接转 Supply（一行搞定！）
@@ -22,7 +22,7 @@ sub MAIN(
     # 异步并发处理（正确写法：map -> start -> flat）
     $file-supply
         .map(-> $file { start process-file($file) })
-        .flat
+        .flat(concurrency => $concurrency) # 👈 控制并发
         .wait;
 
     say "\n✅ 所有文件重命名完成！";
