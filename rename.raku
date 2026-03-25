@@ -27,19 +27,29 @@ sub MAIN(
 
     say "\n✅ 所有文件重命名完成！";
 
-    # 单独抽取处理函数，代码更干净
-    sub process-file(IO::Path $file) {
-        my $real = $file.resolve;
-        my $new-name = random-string(
-            chars => $char-len,
-            ranges => ['a'..'z', 'A'..'Z', '0'..'9']
-        );
+    # 带异常捕获的处理函数
+    sub process-file(IO::Path $real) {
+        try {
+            # 你确认可用的正确写法
+            my $ext = $real.extension;
 
-        my $ext = $real.extension;
-        my $new-file = $real.parent.add($new-name);
-        $new-file .= extension($ext) if $ext;
+            my $new-name = random-string(
+                chars => $char-len,
+                ranges => ['a'..'z','A'..'Z','0'..'9']
+            );
 
-        say "$real => \n\t{$new-file.absolute}";
-        rename($real, $new-file) if !$dry;
+            # 构建新文件名（保持原目录）
+            my $new-file = $real.parent.add($new-name);
+            $new-file .= extension($ext) if $ext;
+
+            say "✅ $real →\n\t$new-file";
+
+            # 执行重命名
+            rename($real, $new-file) if !$dry;
+
+            CATCH {
+                say "❌ 处理失败：$real → {.message}";
+            }
+        }
     }
 }
