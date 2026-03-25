@@ -1,7 +1,6 @@
 #!/usr/bin/env raku
 use v6.d;
 use Data::Generators;
-use File::Find;
 
 sub MAIN(
     Str $files-rx,
@@ -9,46 +8,69 @@ sub MAIN(
     Str :d($dir) = '.',
     Bool :r($recursive) = False,
     Bool :y($dry) = False,
-    Int :$concurrency = 32  # 并发数，SSD 可调 32，机械盘 8
+    Int :$concurrency = 4
 ) {
-    # 🔥 内置 Supply，无需任何 use
-# 🔥 核心：Seq 直接转 Supply（一行搞定！）
-    my $file-supply = find(
-        dir => $dir,
-        name => { /<$files-rx>/ },
-        recursive => $recursive
-    ).Supply;
+    say "🚀 启动扫描: $dir (递归: $recursive)";
+    my Channel $c = Channel.new;
+    my @files;
 
-    # 异步并发处理（正确写法：map -> start -> flat）
-    $file-supply
-        .map(-> $file { start process-file($file) })
-        .flat(concurrency => $concurrency) # 👈 控制并发
-        .wait;
+    # 安全扫描：显示当前目录（自动系统路径分隔符）
+    sub scan(IO::Path $path) {
+        say "📂 扫描中: {$path.absolute}";
+        my @items;
+        try { @items = $path.dir };
+        return unless @items;
 
-    say "\n✅ 所有文件重命名完成！";
+        for @items -> $f {
+            next unless $f.defined;
 
-    # 带异常捕获的处理函数
-    sub process-file(IO::Path $real) {
+            if $f.f && $f.basename ~~ /<$files-rx>/ {
+                @files.push: $f;
+            }
+
+            if $recursive && $f.d {
+                scan($f);
+            }
+        }
+    }
+
+    scan($dir.IO);
+    say "\n✅ 扫描完成！共找到 {+@files} 个文件";
+
+    # 异步通道
+    start {
+        $c.send($_) for @files;
+        $c.close;
+    }
+
+    # 并发处理
+    await do ^$concurrency .map: {
+        start {
+            while $c.poll -> $file {
+                process($file);
+            }
+        }
+    }
+
+    say "\n🎉 全部任务完成！";
+
+    # 重命名（带异常捕获）
+    sub process(IO::Path $real) {
         try {
-            # 你确认可用的正确写法
             my $ext = $real.extension;
-
             my $new-name = random-string(
                 chars => $char-len,
                 ranges => ['a'..'z','A'..'Z','0'..'9']
             );
 
-            # 构建新文件名（保持原目录）
             my $new-file = $real.parent.add($new-name);
             $new-file .= extension($ext) if $ext;
 
-            say "✅ $real →\n\t$new-file";
-
-            # 执行重命名
+            say "✅ {$real.absolute} →\n\t{$new-file.absolute}";
             rename($real, $new-file) if !$dry;
 
             CATCH {
-                say "❌ 处理失败：$real → {.message}";
+                say "❌ 失败: {$real.absolute} → {.message}";
             }
         }
     }
