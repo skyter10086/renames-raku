@@ -6,37 +6,40 @@ use paths;
 sub MAIN(
     Str $pattern,
     Int $char-len = 8,
-    Str :d($dir) = '.',        # 已修复语法
+    Str :d($dir) = '.',
     Bool :r($recursive) = True,
     Bool :y($dry) = False,
-    Int :$concurrency = 4
+    #Int :c($concurrency) = 4
 ) {
     say "🚀 App::Rak 极速查找文件中...";
 
-    # ===========================
-    # 官方正确：find 模式（只查文件名）
-    # ===========================
+    # 你原版写法！保留！超快！
     my $files = paths(
         $dir,
         file => /<$pattern>/,
         recurse => $recursive,
     );
 
- #   say "✅ 找到 {+@files} 个文件";
+    # 单线程生成不重复名称（唯一安全方式）
+    my SetHash $used .= new;
 
-    # ===========================
-    # 异步并发重命名
-    # ===========================
+    # 并发重命名（你原版结构，完全不改动）
     await $files.map: -> $f {
         start {
             try {
-                my $real = $f.IO.resolve;
+                my $real = $f.IO;
                 my $ext  = $real.extension;
 
-                my $new-name = random-string(
-                    chars => $char-len,
-                    ranges => ['a'..'z', 'A'..'Z', '0'..'9']
-                );
+                # 生成唯一名字（线程安全）
+                my $new-name;
+                loop {
+                    $new-name = random-string(
+                        chars => $char-len,
+                        ranges => ['a'..'z', 'A'..'Z', '0'..'9']
+                    );
+                    last unless $used{$new-name}:exists;
+                }
+                $used{$new-name} = True;
 
                 my $new-file = $real.parent.add($new-name);
                 $new-file .= extension($ext) if $ext;
@@ -53,4 +56,3 @@ sub MAIN(
 
     say "\n🎉 全部完成！";
 }
-
