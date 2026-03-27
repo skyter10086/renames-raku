@@ -5,7 +5,7 @@ use paths;
 
 sub MAIN(
     Str $pattern,
-    Int :l($lenth) = 8,
+    Int :l($length) = 8,
     Str :d($dir) = '.',
     Bool :r($recursive) = True,
     Bool :y($dry) = False,
