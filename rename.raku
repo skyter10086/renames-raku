@@ -7,7 +7,7 @@ sub MAIN(
     Str $pattern,
     Int $char-len = 8,
     Str :d($dir) = '.',
-    Bool :r($recursive) = True,
+    Bool :r($recursive) = False,
     Bool :y($dry) = False,
     #Int :c($concurrency) = 4
 ) {
