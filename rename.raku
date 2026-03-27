@@ -19,6 +19,7 @@ sub MAIN(
         name=> /<$pattern>/,
         type=>'file',
         recursive => $recursive,
+        keep-going=>True,
     );
 
     # 单线程生成不重复名称（唯一安全方式）
