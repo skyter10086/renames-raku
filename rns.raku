@@ -21,17 +21,17 @@ sub MAIN(
     );
 
     # 单线程生成不重名名称（绝对安全，不崩溃）
-    my SetHash $used .= new;
+    # my SetHash $used .= new;
     my @tasks = $files.map: -> $f {
         my $real = $f.IO;
         my $ext  = $real.extension;
 
-        my $name;
+        my Str $name;
+        my IO::Path $new;
         repeat {
             $name = random-string(chars => $char-len, ranges => ['a'..'z','A'..'Z','0'..'9']);
-        } while $used{$name}:exists;
-        $used{$name} = True;
-
+        } while $new.e;
+       
         my $new = $real.parent.add($name);
         $new .= extension($ext) if $ext;
         ($real.absolute, $new.absolute)
