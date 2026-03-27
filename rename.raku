@@ -1,7 +1,7 @@
 #!/usr/bin/env raku
 use v6.d;
 use Data::Generators;
-use paths;
+use File::Find;
 
 sub MAIN(
     Str $pattern,
@@ -14,11 +14,11 @@ sub MAIN(
     say "🚀 App::Rak 极速查找文件中...";
 
     # 你原版写法！保留！超快！
-    my $files = paths(
-        $dir,
+    my $files = find(
         dir=>$dir,
-        file => /<$pattern>/,
-        recurse => $recursive,
+        name=> /<$pattern>/,
+        type=>'file',
+        recursive => $recursive,
     );
 
     # 单线程生成不重复名称（唯一安全方式）
@@ -28,7 +28,7 @@ sub MAIN(
     await $files.map: -> $f {
         start {
             try {
-                my $real = $f.IO;
+                my $real = $f;
                 my $ext  = $real.extension;
 
                 # 生成唯一名字（线程安全）
