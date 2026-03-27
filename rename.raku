@@ -21,7 +21,7 @@ sub MAIN(
     );
 
     # 单线程生成不重复名称（唯一安全方式）
-    my SetHash $used .= new;
+    #my SetHash $used .= new;
 
     # 并发重命名（你原版结构，完全不改动）
     await $files.map: -> $f {
@@ -32,18 +32,16 @@ sub MAIN(
 
                 # 生成唯一名字（线程安全）
                 my $new-name;
+                my $new-file;
                 loop {
                     $new-name = random-string(
                         chars => $char-len,
                         ranges => ['a'..'z', 'A'..'Z', '0'..'9']
                     );
-                    last unless $used{$new-name}:exists;
+                    $new-file = $real.parent.add($new-name);
+                    $new-file .= extension($ext) if $ext;
+                    last unless $new-file.e;
                 }
-                $used{$new-name} = True;
-
-                my $new-file = $real.parent.add($new-name);
-                $new-file .= extension($ext) if $ext;
-
                 say "✅ {$real.absolute} →\n\t{$new-file.absolute}";
                 rename($real, $new-file) unless $dry;
 
