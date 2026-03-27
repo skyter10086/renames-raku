@@ -1,58 +1,53 @@
 #!/usr/bin/env raku
 use v6.d;
 use Data::Generators;
-use paths;
+use File::Find;
 
 sub MAIN(
     Str $pattern,
-    Int :l($length) = 8,
+    Int $char-len = 8,
     Str :d($dir) = '.',
-    Bool :r($recursive) = True,
+    Bool :r($recursive) = False,
     Bool :y($dry) = False,
-    Int :c($concurrency) = 8  # 这个真的有用！
+    Int :c($concurrency) = 16,
 ) {
-    say "🚀 App::Rak 极速重命名（并发：$concurrency）";
+    say "🚀 File::Find 极速查找文件中...";
 
-    # 你原版：保留懒加载 Seq，超快
-    my $files = paths(
-        $dir,
-        file => /<$pattern>/,
-        recurse => $recursive
+    # 🔥 关键：keep-going => True 跳过权限错误，继续运行
+    my $files = find(
+        dir => $dir,
+        name => /<$pattern>/,
+        type => 'file',
+        recursive => $recursive,
+        keep-going => True,  # ✅ 遇到权限错误不退出，继续扫描
     );
 
-    # 单线程生成不重名名称（绝对安全，不崩溃）
-   
-    my @tasks = $files.map: -> $f {
-        my $real = $f.IO;
-        my $ext  = $real.extension;
-
-        my Str $name;
-        my IO::Path $new;
-        repeat {
-            $name = random-string(chars => $length, ranges => ['a'..'z','A'..'Z','0'..'9']);
-        } while $new.e;
-       
-        my $new = $real.parent.add($name);
-        $new .= extension($ext) if $ext;
-        ($real.absolute, $new.absolute)
-    };
-
-    # ===========================
-    # ✅ 官方标准：启动 N 个工作线程（真·并发控制）
-    # ===========================
-    my Channel $ch .= new;
-    $ch.send($_) for @tasks;
-    $ch.close;
-
-    # 启动固定数量的工作协程
-    await do for ^$concurrency {
+    # 并发重命名
+    await $files.race(degree => $concurrency).map: -> $f {
         start {
-            while $ch.poll -> $task {
-                my ($old, $new) = |$task;
-                try {
-                    say "✅ $old → $new";
-                    rename($old,$new) unless $dry;
-                    CATCH { say "❌ 失败: $old" }
+            try {
+                my IO::Path $real = $f;
+                my $ext  = $real.extension;
+
+                my $new-name;
+                my $new-file;
+
+                # 先生成，再判断是否存在（do while 等价）
+                repeat {
+                    $new-name = random-string(
+                        chars => $char-len,
+                        ranges => ['a'..'z', 'A'..'Z', '0'..'9']
+                    );
+                    $new-file = $real.parent.add($new-name);
+                    $new-file .= extension($ext) if $ext;
+                } while $new-file.e;
+
+                say "✅ {$real.absolute} → {$new-file.absolute}";
+
+                rename($real, $new-file) unless $dry;
+
+                CATCH {
+                    say "❌ 失败: {$real.absolute}";
                 }
             }
         }
