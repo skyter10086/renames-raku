@@ -16,6 +16,7 @@ sub MAIN(
     # 你原版写法！保留！超快！
     my $files = paths(
         $dir,
+        dir=>$dir,
         file => /<$pattern>/,
         recurse => $recursive,
     );
